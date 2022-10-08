@@ -1,6 +1,6 @@
 from flask import Flask, make_response, render_template, request, redirect
-from lib.colordescriptor import ColorDescriptor
-from lib.searcher import Searcher
+from libnya.colordescriptor import ColorDescriptor
+from libnya.pencari import Searcher
 from PIL import Image
 import numpy as np
 import cv2
@@ -8,8 +8,6 @@ import os
 import shutil
 import time
 import csv
-from paste.translogger import TransLogger
-from waitress import serve
 
 app = Flask(__name__)
 
@@ -24,7 +22,7 @@ def cekawal():
 
 @app.route('/home')
 def home():
-	with open('conf/conf.csv','r') as conf:
+	with open('conf.csv','r') as conf:
 		tp = 0
 		tn = 0
 		fp = 0
@@ -45,15 +43,15 @@ def home():
 	rekal = round(((tp/(fn+tp))*100),2)
 	f1 = round((2*(rekal*presisi)/(rekal+presisi)),2)
 
-	datasets = os.listdir('static/datasets')
+	datasets = os.listdir('static/coba')
 	if os.path.exists('static/temp') == True :
 		image_names = os.listdir('static/temp')
 		nearest = sorted(os.listdir('static/temp'))[0]
 		target = os.listdir('static/tmp')
 		return render_template("index.html", f1=(f1), akurasi=(akurasi), presisi=(presisi), rekal=(rekal), image_names=sorted(image_names),\
-		target=(target), page_status=1, count=len(datasets), nearest=(nearest))
+		target=(target), aw=1, count=len(datasets), nearest=(nearest))
 	else :
-		return render_template("index.html", page_status=2, count=len(datasets))
+		return render_template("index.html", aw=2, count=len(datasets))
 
 @app.route('/search', methods=['POST'])
 def search():
@@ -66,7 +64,7 @@ def search():
 	
 	features = cd.describe(query)
 	 
-	searcher = Searcher('conf/index.csv')
+	searcher = Searcher('index.csv')
 	results = searcher.search(features)
 
 	positif=['mou','sea','des']
@@ -76,7 +74,7 @@ def search():
 	fp = 1 if nama not in positif and nama == observ else 0
 	fn = 1 if nama in positif and nama != observ else 0
 	conma = [tp,tn,fp,fn]
-	with open('conf/conf.csv','a') as conf:
+	with open('conf.csv','a') as conf:
 		tulis = csv.writer(conf)
 		tulis.writerow(conma)
 	conf.close
@@ -87,7 +85,7 @@ def search():
 	i = 1
 	for (score, resultID) in results:
 		i += 1
-		result = cv2.imread("static/datasets/" + resultID)
+		result = cv2.imread("static/coba/" + resultID)
 		saveimg = cv2.imwrite("static/temp/" + str(score) + str(i) + ".jpeg", result)
 
 	imgstr = time.strftime("%Y%m%d-%H%M%S")
@@ -96,7 +94,9 @@ def search():
 
 @app.route('/<page_name>')
 def other_page(page_name):
-	return render_template("404.html"), 404
+	response = make_response('The page named %s does not exist.' \
+                             % page_name, 404)
+	return response
 
 if __name__ == '__main__':
-	serve(TransLogger(app, setup_console_handler=False), host="0.0.0.0", port=5000)
+	app.run(debug=True)
